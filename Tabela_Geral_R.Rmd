@@ -1,0 +1,214 @@
+---
+title: "Crops1"
+output: html_document
+---
+
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(stargazer)
+library(tidyr)
+library(kableExtra)
+```
+
+
+
+```{r}
+crops <- read_excel("Tabela_Geral.xlsx", sheet = 3, col_names = TRUE)
+```
+
+
+The first step to analyze the data it to group the different rotations - that have different values dimensions, occupy different columns, and sometimes have significant NA between crops - in one single string. It will allow us to clearly visualize the rotation as a sequence - even when they have different lengths.
+
+
+```{r}
+crops1 <- crops %>%
+  unite("Rotation", OI_2013:PV_2032, sep = "_", na.rm = TRUE)
+```
+
+
+##### 1. Searching the most common rotations
+
+
+First, we look at the most common rotations from the whole dataset - without grouping or specifying any filters.
+
+```{r}
+crops2 <- crops1 %>%
+  count(Rotation, sort = TRUE) %>%
+  top_n(15)
+
+kable(crops2) %>%
+  kable_styling(latex_options = "striped")
+```
+
+
+
+
+When we look at the data, we see that part in the group of the most common data rotation, some of them are the same, they just have a different order. They are technically the same type of rotation, but since they are string values, R compute them as different. We, however, count them as the same. So, for example, Soja_Cereales de Invierno and Cereales de Invierno_Soja are the same type of rotation. The challenge is to identify possible common rotations that maybe relevant when jointing their "opposing" parent.
+
+```{r}
+#Identifying the Soja_Cultivo de Cobertura rotation out of order#
+
+crops3 <- crops1 %>%
+  filter(Rotation == "Cultivo de Cobertura_Soja") %>%
+  count(Rotation)
+
+kable(crops3) %>%
+  kable_styling(latex_options = "striped")
+```
+
+
+
+1. Soja_Cereales de Invierno_Soja_Cultivo de Cobertura - 1975
+
+2. Soja_Cereales de Invierno - 1693
+
+3. Soja_Cereales de Invierno_Soja_Cereales de Invierno - 1635
+
+4. Soja_Cultivo de Cobertura - 1459
+
+
+Looking at the data, we can see the most common rotations. It is essential to look more broadly at this table when using this method, since the data used by the farmers have different extensions, but they actually mean the same thing. For example, the rotation Soja (PV) + Cereales de Invierno (OI) actually means the same thing as Soja (PV) + Cereales de Invierno (OI) + Soja (PV) + Cereales de Invierno (OI). To assert with conviction the nuances of the table, it will be essential to either apply a replication process or use a dictionary technique (to be applied later). However, it is essential to note that the more frequent rotations are based on the choice of Soybean for the Spring/Summer crop and the choice of Cereles de Invierno or Cultivo de Cobertura for the Autumn/Winter crop.
+
+
+
+##### 2. Searching the most common rotations by filters
+
+
+#### 2.1 Most common by Tolerance Level:
+
+Finding the top 5 most common rotation by level of tolerance:
+
+```{r}
+crops_na <- crops1 %>%
+  mutate_all(na_if,"") %>%
+  drop_na(Rotation)
+```
+
+
+```{r}
+crops4 <- crops_na %>%
+  group_by(Tolerancia) %>%
+  count(Rotation, sort = TRUE) %>%
+  top_n(5) %>%
+  arrange(Tolerancia)
+
+kable(crops4) %>%
+  kable_styling(latex_options = "striped")
+```
+
+
+#### 2.2 Most common by Localization:
+
+Finding the top most common rotation by localization:
+
+First just by department:
+
+
+
+```{r}
+crops5 <- crops_na %>%
+  group_by(`Depto...8`) %>%
+  count(Rotation, sort = TRUE) %>%
+  top_n(1) %>%
+  arrange
+
+kable(crops5) %>%
+  kable_styling(latex_options = "striped")
+```
+
+
+And then by Ubicacion (Depto + SP):
+
+```{r}
+crops6 <- crops_na %>%
+  group_by(`Ubicacion (Depto&SP)`) %>%
+  count(Rotation, sort = TRUE) %>%
+  top_n(1) %>%
+  arrange(`Ubicacion (Depto&SP)`)
+
+kable(crops6) %>%
+  kable_styling(latex_options = "striped")
+```
+
+#### 2.3 Most common by Land owning status:
+
+
+```{r}
+crops7 <- crops_na %>%
+  group_by(Tenedor) %>%
+  count(Rotation, sort = TRUE) %>%
+  top_n(10) %>%
+  arrange(Tenedor)
+
+kable(crops7) %>%
+  kable_styling(latex_options = "striped")
+```
+
+##### 3. Searching by Status of the Plan
+
+#### 3.1 By localization
+
+```{r}
+crops_3_1 <- crops1 %>%
+  group_by(`Plan modificado? 1= SI`) %>%
+  count(Depto...8, sort = TRUE) %>%
+  arrange(Depto...8)
+
+kable(crops_3_1) %>%
+  kable_styling(latex_options = "striped")
+  
+```
+
+#### 3.2 By area
+
+```{r}
+crops_3_2 <- crops1 %>%
+  group_by(`Plan modificado? 1= SI`) %>%
+  summarize(mean(Chacra_area), na.rm = TRUE)
+
+kable(crops_3_2) %>%
+  kable_styling(latex_options = "striped")
+  
+```
+
+#### 3.3 By land ownership
+
+```{r}
+crops_3_3 <- crops1 %>%
+  group_by(`Plan modificado? 1= SI`) %>%
+  count(Tenedor, sort = TRUE) %>%
+  arrange(Tenedor)
+
+kable(crops_3_3) %>%
+  kable_styling(latex_options = "striped")
+  
+```
+
+#### 3.4 By the year of modification
+
+```{r}
+crops_3_4 <- crops1 %>%
+  mutate(Year = substr(fecha_modificado, 1, 4)) %>%
+  group_by(`Plan modificado? 1= SI`) %>%
+  count(Year, sort = TRUE) %>%
+  arrange(Year)
+
+kable(crops_3_4) %>%
+  kable_styling(latex_options = "striped")
+  
+  
+```
+
+
+
+
+
+
+
